@@ -1,23 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Produto } from './entities/produto.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ProdutosService {
-  constructor(
-    @InjectRepository(Produto)
-    private produtoRepository: Repository<Produto>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  // Salva um produto novo no banco
-  create(dadosProduto: Partial<Produto>) {
-    const novoProduto = this.produtoRepository.create(dadosProduto);
-    return this.produtoRepository.save(novoProduto);
+  create(dados: { nome: string; descricao?: string; preco: number; ativo?: boolean }) {
+    return this.prisma.produto.create({ data: dados });
   }
 
-  // Puxa todos os produtos cadastrados
   findAll() {
-    return this.produtoRepository.find();
+    return this.prisma.produto.findMany();
   }
 }

@@ -1,13 +1,12 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsuariosService } from './usuarios.service';
+import { PrismaModule } from '../prisma/prisma.module';
 import { UsuariosController } from './usuarios.controller';
-import { Usuario } from './entities/usuario.entity';
+import { UsuariosService } from './usuarios.service';
 
 @Module({
-  // ESSA É A LINHA MÁGICA QUE AVISA O BANCO:
-  imports: [TypeOrmModule.forFeature([Usuario])], 
+  imports: [PrismaModule],
   controllers: [UsuariosController],
   providers: [UsuariosService],
+  exports: [UsuariosService],
 })
 export class UsuariosModule {}

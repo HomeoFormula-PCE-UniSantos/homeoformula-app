@@ -1,46 +1,45 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from '../../../../../prisma/prisma.service';
 import { FamiliarRepositoryPort } from '../../../core/ports/out/familiar.repository.port';
 import { Familiar } from '../../../core/entities/familiar.entity';
-import { FamiliarOrmEntity } from './familiar.orm-entity';
 
 @Injectable()
 export class FamiliarRepositoryAdapter implements FamiliarRepositoryPort {
-  constructor(
-    @InjectRepository(FamiliarOrmEntity)
-    private readonly familiarRepo: Repository<FamiliarOrmEntity>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async salvar(familiar: Familiar): Promise<void> {
-    // 1. Converte a entidade de domínio para a entidade do TypeORM
-    const ormEntity = this.familiarRepo.create({
-      id: familiar.id,
-      clienteId: familiar.clienteId,
-      nome: familiar.nome,
-      parentesco: familiar.parentesco,
-      dataNascimento: familiar.dataNascimento,
+    await this.prisma.familiar.upsert({
+      where: { id: familiar.id },
+      update: {
+        usuarioId: familiar.usuarioId,
+        nome: familiar.nome,
+        parentesco: familiar.parentesco,
+        dataNascimento: familiar.dataNascimento ? new Date(familiar.dataNascimento) : null,
+      },
+      create: {
+        id: familiar.id,
+        usuarioId: familiar.usuarioId,
+        nome: familiar.nome,
+        parentesco: familiar.parentesco,
+        dataNascimento: familiar.dataNascimento ? new Date(familiar.dataNascimento) : null,
+      },
     });
-
-    // 2. Salva no banco de dados
-    await this.familiarRepo.save(ormEntity);
   }
 
-  async buscarPorClienteId(clienteId: string): Promise<Familiar[]> {
-    // 1. Busca todos os dependentes de um cliente específico
-    const ormEntities = await this.familiarRepo.find({ 
-      where: { clienteId } 
-    });
-
-    // 2. Converte de volta para a nossa entidade pura
-    return ormEntities.map(
-      (orm) => new Familiar(
-        orm.id,
-        orm.clienteId,
-        orm.nome,
-        orm.parentesco,
-        orm.dataNascimento
-      )
+  async buscarPorUsuarioId(usuarioId: string): Promise<Familiar[]> {
+    const rows = await this.prisma.familiar.findMany({ where: { usuarioId } });
+    return rows.map(
+      (r) => new Familiar(
+        r.id,
+        r.usuarioId,
+        r.nome,
+        r.parentesco,
+        r.dataNascimento?.toISOString(),
+      ),
     );
+  }
+
+  async remover(familiarId: string, usuarioId: string): Promise<void> {
+    await this.prisma.familiar.deleteMany({ where: { id: familiarId, usuarioId } });
   }
 }

@@ -1,26 +1,24 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Usuario } from './entities/usuario.entity';
+import { Injectable, ConflictException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsuariosService {
-  constructor(
-    @InjectRepository(Usuario)
-    private usuarioRepository: Repository<Usuario>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async login(email: string, senha: string) {
-    // 1. Procura o usuário pelo email digitado
-    const usuario = await this.usuarioRepository.findOne({ where: { email } });
-
-    // 2. Se não achar o email ou a senha for diferente, dá erro 401 (Não autorizado)
-    if (!usuario || usuario.senha !== senha) {
-      throw new UnauthorizedException('Email ou senha incorretos');
+  async criarUsuario(email: string, senha: string) {
+    const senhaHasheada = await bcrypt.hash(senha, 10);
+    try {
+      const usuario = await this.prisma.usuario.create({
+        data: { email, senha: senhaHasheada },
+      });
+      return { mensagem: 'Usuário cadastrado com sucesso!', email: usuario.email };
+    } catch {
+      throw new ConflictException('Esse e-mail já está cadastrado.');
     }
+  }
 
-    // 3. Se deu tudo certo, separamos a senha (para não devolver pro Frontend) e retornamos o resto
-    const { senha: _, ...dadosSeguros } = usuario;
-    return dadosSeguros;
+  async buscarPorEmail(email: string) {
+    return this.prisma.usuario.findUnique({ where: { email } });
   }
 }

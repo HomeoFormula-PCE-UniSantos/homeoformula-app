@@ -1,21 +1,24 @@
 import 'multer';
-import { 
-  Controller, 
-  Post, 
-  UseInterceptors, 
-  UploadedFile, 
-  Body, 
-  Inject, 
+import {
+  Controller,
+  Get,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+  Body,
+  Inject,
+  Param,
+  Request,
+  UseGuards,
   BadRequestException,
-  Param // Adicionado para capturar o ID na URL
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { 
-  ENVIAR_RECEITA_USE_CASE, 
-  EnviarReceitaUseCasePort 
+import { JwtAuthGuard } from '../../../../auth/core/guards/jwt-auth.guard';
+import { OrcamentoService } from '../../../orcamento.service';
+import {
+  ENVIAR_RECEITA_USE_CASE,
+  EnviarReceitaUseCasePort,
 } from '../../../core/ports/in/enviar-receita.use-case.port';
-import { RenovarReceitaUseCasePort, RENOVAR_RECEITA_USE_CASE } from 'src/modules/orcamento/core/ports/in/renovar-receita.use-case.port';// Importação da nova porta de renovação que manterá o padrão arquitetural
-
 
 @Controller('orcamentos')
 export class OrcamentoController {
@@ -23,13 +26,17 @@ export class OrcamentoController {
     @Inject(ENVIAR_RECEITA_USE_CASE)
     private readonly enviarReceitaUseCase: EnviarReceitaUseCasePort,
 
-    // Injeção da nova interface do caso de uso de renovação
-    @Inject(RENOVAR_RECEITA_USE_CASE)
-    private readonly renovarReceitaUseCase: RenovarReceitaUseCasePort,
+    private readonly orcamentoService: OrcamentoService,
   ) {}
 
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  async listarMeusPedidos(@Request() req: any) {
+    return this.orcamentoService.listarPorUsuario(req.user.id);
+  }
+
   @Post('receita')
-  @UseInterceptors(FileInterceptor('arquivo')) 
+  @UseInterceptors(FileInterceptor('arquivo'))
   async enviarReceita(
     @UploadedFile() arquivo: Express.Multer.File,
     @Body() body: { clienteId: string; observacoes?: string },
@@ -55,25 +62,9 @@ export class OrcamentoController {
     };
   }
 
-  // NOVA ROTA: Endpoint para renovação de pedido sem reenvio de arquivo
-  @Post('renovar/:id')
-  async renovarReceita(@Param('id') id: string) {
-    if (!id) {
-      throw new BadRequestException('O ID do pedido original é obrigatório para realizar a renovação.');
-    }
-
-    // Encaminha a execução para a porta do domínio
-    const resultado = await this.renovarReceitaUseCase.executar({
-      orcamentoId: id,
-    });
-
-    // 👇 ADICIONE ESTA LINHA AQUI:
-    console.log('✅ SUCESSO! O BANCO DEVOLVEU ISSO:', resultado);
-
-    return {
-      sucesso: true,
-      mensagem: 'Pedido de renovação enviado com sucesso! O farmacêutico já foi notificado.',
-      dados: resultado,
-    };
+  @Post(':id/renovar')
+  @UseGuards(JwtAuthGuard)
+  async renovarPedido(@Param('id') id: string, @Request() req: any) {
+    return this.orcamentoService.renovarPedido(id, req.user.id);
   }
 }

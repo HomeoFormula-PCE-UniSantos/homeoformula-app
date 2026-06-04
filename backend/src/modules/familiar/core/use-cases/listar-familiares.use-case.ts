@@ -10,8 +10,7 @@ export class ListarFamiliaresUseCase implements ListarFamiliaresUseCasePort {
     private readonly familiarRepository: FamiliarRepositoryPort,
   ) {}
 
-  async executar(clienteId: string): Promise<Familiar[]> {
-    // Repassa a chamada para o nosso Adapter do banco de dados (que já criamos antes!)
-    return this.familiarRepository.buscarPorClienteId(clienteId);
+  async executar(usuarioId: string): Promise<Familiar[]> {
+    return this.familiarRepository.buscarPorUsuarioId(usuarioId);
   }
 }

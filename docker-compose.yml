@@ -59,11 +59,13 @@ services:
     depends_on:
       - backend
 
+  # Adminer - Gerenciador do Banco (Lugar Certo)
+  adminer:
+    image: adminer
+    container_name: homeoformula_adminer
+    ports:
+      - "8081:8080"
+
 volumes:
   pgdata:
   miniodata:
-
-  adminer:
-    image: adminer
-    ports:
-      - "8081:8080"

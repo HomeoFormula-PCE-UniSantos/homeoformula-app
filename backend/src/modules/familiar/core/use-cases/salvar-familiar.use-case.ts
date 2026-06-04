@@ -12,21 +12,15 @@ export class SalvarFamiliarUseCase implements SalvarFamiliarUseCasePort {
   ) {}
 
   async executar(input: SalvarFamiliarInputDto): Promise<{ sucesso: boolean; id: string }> {
-    // 1. Gera um ID único e seguro para o novo dependente
     const novoId = randomUUID();
-
-    // 2. Monta a nossa entidade pura
     const novoFamiliar = new Familiar(
       novoId,
-      input.clienteId,
+      input.usuarioId,
       input.nome,
       input.parentesco,
-      input.dataNascimento
+      input.dataNascimento,
     );
-
-    // 3. Manda o banco de dados salvar
     await this.familiarRepository.salvar(novoFamiliar);
-
     return { sucesso: true, id: novoId };
   }
 }

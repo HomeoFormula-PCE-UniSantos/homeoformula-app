@@ -1,67 +1,41 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from '../../../../../prisma/prisma.service';
 import { OrcamentoRepositoryPort } from '../../../core/ports/out/orcamento.repository.port';
 import { Orcamento } from '../../../core/entities/orcamento.entity';
-import { OrcamentoOrmEntity } from './orcamento.orm-entity';
 
 @Injectable()
 export class OrcamentoRepositoryAdapter implements OrcamentoRepositoryPort {
-  
-  constructor(
-    @InjectRepository(OrcamentoOrmEntity)
-    private readonly orcamentoRepo: Repository<OrcamentoOrmEntity>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async salvar(orcamento: Orcamento): Promise<void> {
-    // 1. Mapeia a Entidade de Domínio Pura para a Entidade do TypeORM
-    const ormEntity = this.orcamentoRepo.create({
-      id: orcamento.id,
-      clienteId: orcamento.clienteId,
-      arquivoReceitaUrl: orcamento.arquivoReceitaUrl, // Atenção ao camelCase aqui
-      status: orcamento.status,
-      observacoes: orcamento.observacoes,
+    await this.prisma.orcamento.upsert({
+      where: { id: orcamento.id },
+      update: {
+        clienteId: orcamento.clienteId,
+        arquivoReceitaUrl: orcamento.arquivoReceitaUrl,
+        status: orcamento.status,
+        observacoes: orcamento.observacoes,
+      },
+      create: {
+        id: orcamento.id,
+        clienteId: orcamento.clienteId,
+        arquivoReceitaUrl: orcamento.arquivoReceitaUrl,
+        status: orcamento.status,
+        observacoes: orcamento.observacoes,
+      },
     });
-
-    // 2. Salva no PostgreSQL
-    await this.orcamentoRepo.save(ormEntity);
   }
 
   async buscarPorClienteId(clienteId: string): Promise<Orcamento[]> {
-    // 1. Busca no PostgreSQL
-    const ormEntities = await this.orcamentoRepo.find({ 
-      where: { clienteId } 
-    });
-
-    // 2. Mapeia de volta para a Entidade de Domínio Pura antes de devolver pro Caso de Uso
-    return ormEntities.map(
-      (orm) => new Orcamento(
-        orm.id, 
-        orm.clienteId, 
-        orm.arquivoReceitaUrl, 
-        orm.status as 'PENDENTE' | 'RESPONDIDO', 
-        orm.observacoes
-      )
+    const rows = await this.prisma.orcamento.findMany({ where: { clienteId } });
+    return rows.map(
+      (r) => new Orcamento(r.id, r.clienteId, r.arquivoReceitaUrl, r.status as 'PENDENTE' | 'RESPONDIDO', r.observacoes ?? undefined),
     );
   }
 
-  // 👇 NOVA FUNÇÃO ADICIONADA: Busca um pedido específico pelo ID
   async buscarPorId(id: string): Promise<Orcamento | null> {
-    const ormEntity = await this.orcamentoRepo.findOne({
-      where: { id }
-    });
-
-    if (!ormEntity) {
-      return null;
-    }
-
-    // Mapeia o resultado do banco para a sua entidade pura do domínio
-    return new Orcamento(
-      ormEntity.id,
-      ormEntity.clienteId,
-      ormEntity.arquivoReceitaUrl,
-      ormEntity.status as 'PENDENTE' | 'RESPONDIDO',
-      ormEntity.observacoes
-    );
+    const r = await this.prisma.orcamento.findUnique({ where: { id } });
+    if (!r) return null;
+    return new Orcamento(r.id, r.clienteId, r.arquivoReceitaUrl, r.status as 'PENDENTE' | 'RESPONDIDO', r.observacoes ?? undefined);
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../lib/api';
 
-// Tipo para ajudar o TypeScript a entender o que é um Produto
 interface Produto {
   id: string;
   nome: string;
@@ -26,7 +26,7 @@ export default function AdminProdutos() {
 
   const carregarProdutos = async () => {
     try {
-      const response = await fetch('http://localhost:3000/produtos');
+      const response = await apiFetch('/produtos');
       if (response.ok) {
         const data = await response.json();
         setProdutos(data);
@@ -44,16 +44,9 @@ export default function AdminProdutos() {
       // Converte o preço para número antes de mandar pro backend
       const precoNumero = parseFloat(preco.replace(',', '.'));
 
-      const response = await fetch('http://localhost:3000/produtos', {
+      const response = await apiFetch('/produtos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nome,
-          descricao,
-          preco: precoNumero,
-        }),
+        body: JSON.stringify({ nome, descricao, preco: precoNumero }),
       });
 
       if (response.ok) {

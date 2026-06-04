@@ -1,5 +1,5 @@
 export interface SalvarFamiliarInputDto {
-  clienteId: string;
+  usuarioId: string;
   nome: string;
   parentesco: string;
   dataNascimento?: string;

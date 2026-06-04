@@ -2,46 +2,42 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 
-export default function Login() {
+export default function Cadastro() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [erro, setErro] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleCadastro = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setErro('');
 
+    if (senha !== confirmarSenha) {
+      setErro('As senhas não coincidem.');
+      return;
+    }
+    if (senha.length < 6) {
+      setErro('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const response = await apiFetch('/auth/login', {
+      const response = await apiFetch('/usuarios', {
         method: 'POST',
         body: JSON.stringify({ email, senha }),
       });
 
       if (!response.ok) {
         const text = await response.text();
-        let errorMessage = `Erro do servidor (Status: ${response.status})`;
-        try {
-          const errorData = JSON.parse(text);
-          errorMessage = errorData.message || errorMessage;
-        } catch { /* empty */ }
-        throw new Error(errorMessage);
+        let msg = `Erro ao cadastrar (Status: ${response.status})`;
+        try { msg = JSON.parse(text).message || msg; } catch { /* empty */ }
+        throw new Error(msg);
       }
 
-      const data = await response.json();
-
-      // Salva o token (backend retorna { access_token })
-      localStorage.setItem('token_farmacia', data.access_token);
-
-      // Extrai os dados do usuário do payload JWT (base64)
-      try {
-        const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-        localStorage.setItem('usuario_farmacia', JSON.stringify({ id: payload.sub, email: payload.email }));
-      } catch { /* payload inválido, ignora */ }
-
-      navigate('/meus-pedidos');
+      navigate('/login?cadastrado=true');
     } catch (error: unknown) {
       setErro(error instanceof Error ? error.message : 'Erro de conexão com o servidor.');
     } finally {
@@ -55,9 +51,7 @@ export default function Login() {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-blue-600 mb-2">HomeoFórmula</h1>
-          <p className="text-gray-500">
-            Acesse sua conta para gerenciar orçamentos e dependentes.
-          </p>
+          <p className="text-gray-500">Crie sua conta para gerenciar orçamentos.</p>
         </div>
 
         {erro && (
@@ -66,7 +60,7 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleCadastro} className="space-y-5">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">E-mail</label>
             <input
@@ -87,36 +81,38 @@ export default function Login() {
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-              placeholder="••••••••"
+              placeholder="Mínimo 6 caracteres"
             />
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 text-gray-600 cursor-pointer">
-              <input type="checkbox" className="rounded text-blue-600 focus:ring-blue-500" />
-              Lembrar de mim
-            </label>
-            <a href="#" className="text-blue-600 font-semibold hover:underline">
-              Esqueceu a senha?
-            </a>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Confirmar Senha</label>
+            <input
+              type="password"
+              required
+              value={confirmarSenha}
+              onChange={(e) => setConfirmarSenha(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+              placeholder="Repita a senha"
+            />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50 flex justify-center items-center gap-2 mt-4"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50 mt-4"
           >
-            {isLoading ? 'Entrando...' : 'Entrar na Plataforma'}
+            {isLoading ? 'Criando conta...' : 'Criar Conta'}
           </button>
         </form>
 
         <div className="mt-8 text-center text-sm text-gray-500 pt-6 border-t border-gray-100">
-          Ainda não tem conta?{' '}
+          Já tem conta?{' '}
           <button
-            onClick={() => navigate('/cadastro')}
+            onClick={() => navigate('/login')}
             className="text-blue-600 font-bold hover:underline"
           >
-            Cadastre-se aqui
+            Entrar aqui
           </button>
         </div>
       </div>

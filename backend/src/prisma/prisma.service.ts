@@ -6,13 +6,12 @@ import pg from 'pg';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
-    // Configura o pool de conexão exigido pelo Prisma 7
-    const pool = new pg.Pool({ 
-      connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/postgres?schema=public" 
+    const pool = new pg.Pool({
+      connectionString:
+        process.env.DATABASE_URL ||
+        'postgresql://postgres:postgres@localhost:5433/homeoformula?schema=public',
     });
     const adapter = new PrismaPg(pool);
-
-    // Inicializa o construtor injetando o adaptador oficial
     super({ adapter });
   }
 

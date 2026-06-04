@@ -7,13 +7,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  // 👇 A nossa passagem secreta para enganar o navegador entra aqui!
   server: {
     proxy: {
-      '/auth': {
-        target: 'http://127.0.0.1:3333',
-        changeOrigin: true,
-      },
-    }
-  }
+      '/auth': { target: 'http://localhost:3000', changeOrigin: true },
+      '/usuarios': { target: 'http://localhost:3000', changeOrigin: true },
+      '/familiares': { target: 'http://localhost:3000', changeOrigin: true },
+      '/orcamentos': { target: 'http://localhost:3000', changeOrigin: true },
+      '/produtos': { target: 'http://localhost:3000', changeOrigin: true },
+    },
+  },
 })

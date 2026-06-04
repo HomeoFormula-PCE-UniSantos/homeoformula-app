@@ -9,6 +9,7 @@
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "ignoreDeprecations": "6.0",
     "baseUrl": "./",
     "rootDir": "./",
     "incremental": true,
@@ -16,11 +17,16 @@
     "strictNullChecks": false,
     "noImplicitAny": false,
     "strictPropertyInitialization": false,
-    "ignoreDeprecations": "6.0",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "paths": {
-      "src/*": ["src/*"]
+      "src/*": [
+        "src/*"
+      ]
     }
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*"
+  ]
 }
