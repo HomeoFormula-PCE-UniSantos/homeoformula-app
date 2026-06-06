@@ -38,6 +38,15 @@ Controle de Versão e Repositório: GitHub
 
 Gestão e Documentação do Projeto: Google Workspace
 
+# Como rodar o projeto
+1. Certifique-se de ter o [Docker](https://www.docker.com/) instalado em sua máquina.
+2. Clone o repositório.
+3. Na raiz do projeto, execute o comando:
+   ```bash
+   docker-compose up -d
+   ```
+4. O sistema estará disponível nas portas definidas nos arquivos de configuração do Docker.
+
 # Documentação Oficial
 Para acessar os diagramas, artefatos de planejamento, atas de reunião e etc, visite o nosso repositório de documentação: [HomeoFormula-Docs](https://github.com/HomeoFormula-PCE-UniSantos/homeoformula-docs)
 
