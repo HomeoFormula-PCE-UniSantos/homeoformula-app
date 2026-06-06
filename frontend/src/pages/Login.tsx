@@ -32,16 +32,19 @@ export default function Login() {
 
       const data = await response.json();
 
-      // Salva o token (backend retorna { access_token })
       localStorage.setItem('token_farmacia', data.access_token);
 
-      // Extrai os dados do usuário do payload JWT (base64)
       try {
         const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-        localStorage.setItem('usuario_farmacia', JSON.stringify({ id: payload.sub, email: payload.email }));
-      } catch { /* payload inválido, ignora */ }
-
-      navigate('/meus-pedidos');
+        const role = data.role ?? payload.role ?? 'CLIENTE';
+        localStorage.setItem(
+          'usuario_farmacia',
+          JSON.stringify({ id: payload.sub, email: payload.email, role }),
+        );
+        navigate(role === 'ADMIN' ? '/dashboard-admin' : '/meus-pedidos');
+      } catch {
+        navigate('/meus-pedidos');
+      }
     } catch (error: unknown) {
       setErro(error instanceof Error ? error.message : 'Erro de conexão com o servidor.');
     } finally {

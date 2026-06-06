@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   UseInterceptors,
   UploadedFile,
   Body,
@@ -14,6 +15,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../../../auth/core/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../../auth/core/guards/roles.guard';
+import { Roles } from '../../../../auth/core/guards/roles.decorator';
 import { OrcamentoService } from '../../../orcamento.service';
 import {
   ENVIAR_RECEITA_USE_CASE,
@@ -29,6 +32,28 @@ export class OrcamentoController {
     private readonly orcamentoService: OrcamentoService,
   ) {}
 
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async listarTodos() {
+    return this.orcamentoService.listarTodos();
+  }
+
+  @Patch('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async avaliarOrcamento(
+    @Param('id') id: string,
+    @Body() body: { status: string; preco?: number; respostaAdmin?: string },
+  ) {
+    return this.orcamentoService.avaliarOrcamento(
+      id,
+      body.status,
+      body.preco,
+      body.respostaAdmin,
+    );
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
   async listarMeusPedidos(@Request() req: any) {
@@ -39,7 +64,7 @@ export class OrcamentoController {
   @UseInterceptors(FileInterceptor('arquivo'))
   async enviarReceita(
     @UploadedFile() arquivo: Express.Multer.File,
-    @Body() body: { clienteId: string; observacoes?: string },
+    @Body() body: { clienteId: string; observacoes?: string; itens?: string; familiarId?: string },
   ) {
     if (!arquivo) {
       throw new BadRequestException('O arquivo da receita é obrigatório.');
@@ -48,18 +73,40 @@ export class OrcamentoController {
       throw new BadRequestException('A identificação do cliente é obrigatória.');
     }
 
-    await this.enviarReceitaUseCase.executar({
+    let itens: Array<{ produtoId: string; quantidade: number }> | undefined;
+    if (body.itens) {
+      try {
+        itens = JSON.parse(body.itens);
+      } catch {
+        throw new BadRequestException('Formato inválido para itens.');
+      }
+    }
+
+    const resultado = await this.enviarReceitaUseCase.executar({
       clienteId: body.clienteId,
       nomeArquivo: arquivo.originalname,
       buffer: arquivo.buffer,
       mimetype: arquivo.mimetype,
       observacoes: body.observacoes,
+      itens,
+      familiarId: body.familiarId || undefined,
     });
 
     return {
       sucesso: true,
+      id: resultado.id,
       mensagem: 'Receita enviada com sucesso! Nossa equipe analisará e você receberá o orçamento em breve.',
     };
+  }
+
+  @Patch(':id/responder-cliente')
+  @UseGuards(JwtAuthGuard)
+  async responderCliente(
+    @Param('id') id: string,
+    @Body() body: { acao: 'APROVAR' | 'RECUSAR' },
+    @Request() req: any,
+  ) {
+    return this.orcamentoService.responderCliente(id, body.acao, req.user.id);
   }
 
   @Post(':id/renovar')

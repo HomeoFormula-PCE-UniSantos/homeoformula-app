@@ -1,17 +1,146 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { apiFetch } from '../lib/api';
+
+interface PedidoItem {
+  id: string;
+  quantidade: number;
+  precoUnitario: string;
+  produto: { nome: string };
+}
 
 interface Pedido {
   id: string;
   criadoEm: string;
   status: string;
   arquivoReceitaUrl: string;
+  preco: string | null;
+  respostaAdmin: string | null;
+  observacoes: string | null;
+  itens: PedidoItem[];
+  familiar: { nome: string; parentesco: string } | null;
+}
+
+const badgeClass: Record<string, string> = {
+  PENDENTE: 'bg-yellow-100 text-yellow-700',
+  AGUARDANDO_PAGAMENTO: 'bg-blue-100 text-blue-700',
+  PRODUCAO: 'bg-green-100 text-green-700',
+  CANCELADO: 'bg-gray-100 text-gray-500',
+  RECUSADO: 'bg-red-100 text-red-700',
+};
+
+const badgeLabel: Record<string, string> = {
+  PENDENTE: 'Pendente',
+  AGUARDANDO_PAGAMENTO: 'Orçamento Disponível',
+  PRODUCAO: 'Em Produção',
+  CANCELADO: 'Cancelado',
+  RECUSADO: 'Recusado',
+};
+
+function PainelAcao({
+  pedido,
+  isRespondendo,
+  isRenovando,
+  onResponder,
+  onRenovar,
+}: {
+  pedido: Pedido;
+  isRespondendo: string | null;
+  isRenovando: string | null;
+  onResponder: (id: string, acao: 'APROVAR' | 'RECUSAR') => void;
+  onRenovar: (id: string) => void;
+}) {
+  const processandoResposta = isRespondendo === pedido.id;
+  const processandoRenovacao = isRenovando === pedido.id;
+
+  if (pedido.status === 'AGUARDANDO_PAGAMENTO') {
+    return (
+      <div className="ml-0 md:ml-14 bg-blue-50 border border-blue-100 rounded-xl p-5 flex flex-col gap-4">
+        <div>
+          <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-1">
+            Orçamento do Farmacêutico
+          </p>
+          <p className="text-3xl font-bold text-blue-700">
+            {pedido.preco
+              ? `R$ ${Number(pedido.preco).toFixed(2).replace('.', ',')}`
+              : '—'}
+          </p>
+          {pedido.respostaAdmin && (
+            <p className="mt-2 text-sm text-gray-600 italic">
+              "{pedido.respostaAdmin}"
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => onResponder(pedido.id, 'APROVAR')}
+            disabled={processandoResposta}
+            className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
+          >
+            {processandoResposta ? 'Processando...' : '✅ Aprovar Orçamento'}
+          </button>
+          <button
+            onClick={() => onResponder(pedido.id, 'RECUSAR')}
+            disabled={processandoResposta}
+            className="flex-1 py-2.5 border border-red-300 text-red-600 hover:bg-red-50 font-bold rounded-lg transition-colors disabled:opacity-50 text-sm"
+          >
+            {processandoResposta ? 'Processando...' : '❌ Recusar'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (pedido.status === 'PRODUCAO') {
+    return (
+      <div className="ml-0 md:ml-14 flex flex-col gap-3">
+        {pedido.preco && (
+          <p className="text-sm text-gray-500">
+            Valor:{' '}
+            <span className="font-semibold text-gray-700">
+              R$ {Number(pedido.preco).toFixed(2).replace('.', ',')}
+            </span>
+          </p>
+        )}
+        <div>
+          <button
+            onClick={() => onRenovar(pedido.id)}
+            disabled={processandoRenovacao}
+            className="px-5 py-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 text-sm font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {processandoRenovacao ? 'Enviando...' : <><span>🔄</span> Renovar Receita</>}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (pedido.status === 'PENDENTE') {
+    return (
+      <p className="ml-0 md:ml-14 text-sm text-gray-400 italic">
+        Aguardando avaliação da farmácia...
+      </p>
+    );
+  }
+
+  if (pedido.status === 'RECUSADO' || pedido.status === 'CANCELADO') {
+    return (
+      <p className="ml-0 md:ml-14 text-sm text-gray-400">
+        {pedido.status === 'RECUSADO'
+          ? 'Receita recusada pela farmácia. Entre em contato para mais informações.'
+          : 'Pedido cancelado.'}
+      </p>
+    );
+  }
+
+  return null;
 }
 
 export default function MeusPedidos() {
   const navigate = useNavigate();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [isRespondendo, setIsRespondendo] = useState<string | null>(null);
   const [isRenovando, setIsRenovando] = useState<string | null>(null);
   const [isCarregando, setIsCarregando] = useState(true);
 
@@ -20,11 +149,12 @@ export default function MeusPedidos() {
       try {
         const response = await apiFetch('/orcamentos');
         if (response.ok) {
-          const data = await response.json();
-          setPedidos(data);
+          setPedidos(await response.json());
+        } else {
+          toast.error('Não foi possível carregar seus pedidos.');
         }
-      } catch (error) {
-        console.error('Erro ao carregar pedidos:', error);
+      } catch {
+        toast.error('Erro de conexão ao carregar pedidos.');
       } finally {
         setIsCarregando(false);
       }
@@ -32,28 +162,47 @@ export default function MeusPedidos() {
     carregar();
   }, []);
 
+  const handleResponder = async (pedidoId: string, acao: 'APROVAR' | 'RECUSAR') => {
+    setIsRespondendo(pedidoId);
+    try {
+      const response = await apiFetch(`/orcamentos/${pedidoId}/responder-cliente`, {
+        method: 'PATCH',
+        body: JSON.stringify({ acao }),
+      });
+
+      if (!response.ok) throw new Error();
+
+      const atualizado = await response.json();
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === atualizado.id ? { ...p, status: atualizado.status } : p)),
+      );
+
+      toast.success(
+        acao === 'APROVAR'
+          ? 'Orçamento aprovado! Entrando em produção.'
+          : 'Orçamento recusado.',
+      );
+    } catch {
+      toast.error('Erro ao processar resposta. Tente novamente.');
+    } finally {
+      setIsRespondendo(null);
+    }
+  };
+
   const handleRenovar = async (pedidoId: string) => {
     setIsRenovando(pedidoId);
     try {
-      const response = await apiFetch(`/orcamentos/${pedidoId}/renovar`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new Error('Falha ao comunicar com o servidor. Status: ' + response.status);
-      }
-
-      alert('✅ Pedido de renovação enviado com sucesso! O farmacêutico já foi notificado.');
-    } catch (error) {
-      console.error('Erro ao renovar:', error);
-      alert('Erro ao solicitar renovação. Verifique se o backend está rodando.');
+      const response = await apiFetch(`/orcamentos/${pedidoId}/renovar`, { method: 'POST' });
+      if (!response.ok) throw new Error();
+      toast.success('Pedido de renovação enviado! O farmacêutico já foi notificado.');
+    } catch {
+      toast.error('Erro ao solicitar renovação. Verifique se o backend está rodando.');
     } finally {
       setIsRenovando(null);
     }
   };
 
-  const formatarData = (iso: string) =>
-    new Date(iso).toLocaleDateString('pt-BR');
+  const formatarData = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto px-4">
@@ -82,32 +231,68 @@ export default function MeusPedidos() {
             {pedidos.map((pedido) => (
               <div
                 key={pedido.id}
-                className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 hover:bg-gray-50 transition-colors"
+                className="p-6 flex flex-col gap-4 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                  <div className="bg-blue-50 text-blue-600 p-3 rounded-lg">📄</div>
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      Pedido #{pedido.id.substring(0, 8).toUpperCase()}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Enviado em: {formatarData(pedido.criadoEm)}
-                    </p>
+                {/* Cabeçalho do card */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-50 text-blue-600 p-3 rounded-lg text-xl">📄</div>
+                    <div>
+                      <p className="font-semibold text-gray-800">
+                        Pedido #{pedido.id.substring(0, 8).toUpperCase()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Enviado em: {formatarData(pedido.criadoEm)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Paciente:{' '}
+                        {pedido.familiar
+                          ? `${pedido.familiar.nome} (${pedido.familiar.parentesco})`
+                          : 'Titular da Conta'}
+                      </p>
+                    </div>
                   </div>
+                  <span
+                    className={`px-3 py-1 text-xs font-bold rounded-full ${
+                      badgeClass[pedido.status] ?? 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {badgeLabel[pedido.status] ?? pedido.status}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                    {pedido.status}
-                  </span>
-                  <button
-                    onClick={() => handleRenovar(pedido.id)}
-                    disabled={isRenovando === pedido.id}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isRenovando === pedido.id ? 'Enviando...' : <><span>🔄</span> Renovar Receita</>}
-                  </button>
-                </div>
+                {/* Painel condicional por status */}
+                <PainelAcao
+                  pedido={pedido}
+                  isRespondendo={isRespondendo}
+                  isRenovando={isRenovando}
+                  onResponder={handleResponder}
+                  onRenovar={handleRenovar}
+                />
+
+                {/* Itens do pedido — sempre visíveis quando presentes */}
+                {pedido.itens && pedido.itens.length > 0 && (
+                  <div className="ml-0 md:ml-14">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                      Produtos solicitados
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      {pedido.itens.map((item) => (
+                        <div key={item.id} className="flex justify-between text-sm text-gray-600">
+                          <span>
+                            {item.produto.nome} × {item.quantidade}
+                          </span>
+                          <span className="text-gray-500">
+                            R${' '}
+                            {(Number(item.precoUnitario) * item.quantidade)
+                              .toFixed(2)
+                              .replace('.', ',')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

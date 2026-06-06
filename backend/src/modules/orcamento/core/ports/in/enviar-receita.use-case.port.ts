@@ -1,15 +1,20 @@
-// Os dados que o Caso de Uso precisa para trabalhar
+export interface ItemCarrinho {
+  produtoId: string;
+  quantidade: number;
+}
+
 export interface EnviarReceitaCommand {
   clienteId: string;
   nomeArquivo: string;
-  buffer: Buffer; // O conteúdo real do arquivo
-  mimetype: string; // Ex: image/png, application/pdf
+  buffer: Buffer;
+  mimetype: string;
   observacoes?: string;
+  itens?: ItemCarrinho[];
+  familiarId?: string;
 }
 
-// O contrato que diz o que o Caso de Uso sabe fazer
 export interface EnviarReceitaUseCasePort {
-  executar(command: EnviarReceitaCommand): Promise<void>;
+  executar(command: EnviarReceitaCommand): Promise<{ id: string }>;
 }
 
 // O símbolo de injeção de dependência do NestJS

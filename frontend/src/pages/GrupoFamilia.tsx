@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { apiFetch } from '../lib/api';
 
 interface Familiar {
@@ -24,10 +25,10 @@ export default function GrupoFamilia() {
         if (response.ok) {
           setFamiliares(await response.json());
         } else {
-          alert('Não foi possível carregar os familiares.');
+          toast.error('Não foi possível carregar os familiares.');
         }
       } catch {
-        alert('Erro de conexão ao carregar familiares.');
+        toast.error('Erro de conexão ao carregar familiares.');
       } finally {
         setIsCarregando(false);
       }
@@ -63,8 +64,9 @@ export default function GrupoFamilia() {
       setNovoNome('');
       setNovoParentesco('');
       setNovaDataNascimento('');
+      toast.success('Dependente adicionado com sucesso!');
     } catch {
-      alert('Erro ao salvar o familiar. Verifique se o servidor está rodando.');
+      toast.error('Erro ao salvar o familiar. Verifique se o servidor está rodando.');
     } finally {
       setIsSalvando(false);
     }
@@ -76,11 +78,12 @@ export default function GrupoFamilia() {
       const response = await apiFetch(`/familiares/${familiarId}`, { method: 'DELETE' });
       if (response.ok) {
         setFamiliares((prev) => prev.filter((f) => f.id !== familiarId));
+        toast.success('Familiar removido.');
       } else {
-        alert('Não foi possível remover o familiar.');
+        toast.error('Não foi possível remover o familiar.');
       }
     } catch {
-      alert('Erro de conexão ao remover familiar.');
+      toast.error('Erro de conexão ao remover familiar.');
     }
   };
 

@@ -1,19 +1,56 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Delete,
+  Body, Param, UseGuards,
+} from '@nestjs/common';
 import { ProdutosService } from './produtos.service';
+import { JwtAuthGuard } from '../modules/auth/core/guards/jwt-auth.guard';
+import { RolesGuard } from '../modules/auth/core/guards/roles.guard';
+import { Roles } from '../modules/auth/core/guards/roles.decorator';
 
 @Controller('produtos')
 export class ProdutosController {
   constructor(private readonly produtosService: ProdutosService) {}
 
-  // Quando o React mandar um POST para /produtos, ele cria
-  @Post()
-  create(@Body() dadosProduto: any) {
-    return this.produtosService.create(dadosProduto);
+  // Rota pública — lista apenas ativos (para uso futuro no catálogo do cliente)
+  @Get()
+  listarAtivos() {
+    return this.produtosService.listarAtivos();
   }
 
-  // Quando o React mandar um GET para /produtos, ele lista tudo
-  @Get()
-  findAll() {
-    return this.produtosService.findAll();
+  // ── Rotas de Admin ─────────────────────────────────────────────────────────
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  criar(@Body() body: any) {
+    return this.produtosService.criar(body);
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  listarAdmin() {
+    return this.produtosService.listarAdmin();
+  }
+
+  @Get('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  buscarUm(@Param('id') id: string) {
+    return this.produtosService.buscarUm(id);
+  }
+
+  @Patch('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  atualizar(@Param('id') id: string, @Body() body: any) {
+    return this.produtosService.atualizar(id, body);
+  }
+
+  @Delete('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  inativar(@Param('id') id: string) {
+    return this.produtosService.inativar(id);
   }
 }

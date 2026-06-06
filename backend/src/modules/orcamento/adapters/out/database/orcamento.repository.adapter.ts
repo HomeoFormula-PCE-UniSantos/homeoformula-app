@@ -12,6 +12,7 @@ export class OrcamentoRepositoryAdapter implements OrcamentoRepositoryPort {
       where: { id: orcamento.id },
       update: {
         clienteId: orcamento.clienteId,
+        familiarId: orcamento.familiarId ?? null,
         arquivoReceitaUrl: orcamento.arquivoReceitaUrl,
         status: orcamento.status,
         observacoes: orcamento.observacoes,
@@ -19,6 +20,7 @@ export class OrcamentoRepositoryAdapter implements OrcamentoRepositoryPort {
       create: {
         id: orcamento.id,
         clienteId: orcamento.clienteId,
+        familiarId: orcamento.familiarId ?? null,
         arquivoReceitaUrl: orcamento.arquivoReceitaUrl,
         status: orcamento.status,
         observacoes: orcamento.observacoes,

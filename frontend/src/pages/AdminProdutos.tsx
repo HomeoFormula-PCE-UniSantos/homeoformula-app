@@ -1,164 +1,238 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { apiFetch } from '../lib/api';
 
 interface Produto {
   id: string;
   nome: string;
-  descricao: string;
-  preco: string; // O banco devolve como string por causa do decimal
+  descricao: string | null;
+  preco: string;
+  estoque: number;
+  imagemUrl: string | null;
+  ativo: boolean;
 }
 
-export default function AdminProdutos() {
-  const navigate = useNavigate();
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  
-  // Estados do formulário
-  const [nome, setNome] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [preco, setPreco] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+interface FormState {
+  nome: string;
+  descricao: string;
+  preco: string;
+  estoque: string;
+  imagemUrl: string;
+  ativo: boolean;
+}
 
-  // Assim que a tela abre, busca os produtos cadastrados
+const formVazio: FormState = {
+  nome: '',
+  descricao: '',
+  preco: '',
+  estoque: '0',
+  imagemUrl: '',
+  ativo: true,
+};
+
+export default function AdminProdutos() {
+  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [isCarregando, setIsCarregando] = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [produtoEditando, setProdutoEditando] = useState<Produto | null>(null);
+  const [form, setForm] = useState<FormState>(formVazio);
+  const [isSalvando, setIsSalvando] = useState(false);
+  const [isInativando, setIsInativando] = useState<string | null>(null);
+
   useEffect(() => {
     carregarProdutos();
   }, []);
 
   const carregarProdutos = async () => {
+    setIsCarregando(true);
     try {
-      const response = await apiFetch('/produtos');
-      if (response.ok) {
-        const data = await response.json();
-        setProdutos(data);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar produtos:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      // Converte o preço para número antes de mandar pro backend
-      const precoNumero = parseFloat(preco.replace(',', '.'));
-
-      const response = await apiFetch('/produtos', {
-        method: 'POST',
-        body: JSON.stringify({ nome, descricao, preco: precoNumero }),
-      });
-
-      if (response.ok) {
-        // Limpa os campos do form
-        setNome('');
-        setDescricao('');
-        setPreco('');
-        // Atualiza a lista na tela
-        carregarProdutos();
+      const res = await apiFetch('/produtos/admin');
+      if (res.ok) {
+        setProdutos(await res.json());
       } else {
-        alert('Erro ao salvar o produto.');
+        toast.error('Erro ao carregar produtos.');
       }
-    } catch (error) {
-      console.error('Erro de conexão:', error);
+    } catch {
+      toast.error('Erro de conexão.');
     } finally {
-      setIsSubmitting(false);
+      setIsCarregando(false);
     }
   };
+
+  const abrirModalNovo = () => {
+    setProdutoEditando(null);
+    setForm(formVazio);
+    setModalAberto(true);
+  };
+
+  const abrirModalEditar = (p: Produto) => {
+    setProdutoEditando(p);
+    setForm({
+      nome: p.nome,
+      descricao: p.descricao ?? '',
+      preco: Number(p.preco).toFixed(2),
+      estoque: String(p.estoque),
+      imagemUrl: p.imagemUrl ?? '',
+      ativo: p.ativo,
+    });
+    setModalAberto(true);
+  };
+
+  const fecharModal = () => {
+    setModalAberto(false);
+    setProdutoEditando(null);
+    setForm(formVazio);
+  };
+
+  const handleSalvar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSalvando(true);
+
+    const payload = {
+      nome: form.nome,
+      descricao: form.descricao || undefined,
+      preco: parseFloat(form.preco.replace(',', '.')),
+      estoque: parseInt(form.estoque, 10) || 0,
+      imagemUrl: form.imagemUrl || undefined,
+      ativo: form.ativo,
+    };
+
+    try {
+      let res: Response;
+      if (produtoEditando) {
+        res = await apiFetch(`/produtos/admin/${produtoEditando.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await apiFetch('/produtos', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!res.ok) throw new Error();
+
+      const salvo = await res.json();
+
+      setProdutos((prev) =>
+        produtoEditando
+          ? prev.map((p) => (p.id === salvo.id ? salvo : p))
+          : [...prev, salvo],
+      );
+
+      toast.success(produtoEditando ? 'Produto atualizado!' : 'Produto criado com sucesso!');
+      fecharModal();
+    } catch {
+      toast.error('Erro ao salvar produto. Tente novamente.');
+    } finally {
+      setIsSalvando(false);
+    }
+  };
+
+  const handleInativar = async (produto: Produto) => {
+    if (!confirm(`Deseja inativar o produto "${produto.nome}"?`)) return;
+    setIsInativando(produto.id);
+    try {
+      const res = await apiFetch(`/produtos/admin/${produto.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setProdutos((prev) =>
+        prev.map((p) => (p.id === produto.id ? { ...p, ativo: false } : p)),
+      );
+      toast.success('Produto inativado.');
+    } catch {
+      toast.error('Erro ao inativar produto.');
+    } finally {
+      setIsInativando(null);
+    }
+  };
+
+  const campo = (campo: keyof FormState) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => setForm((f) => ({ ...f, [campo]: e.target.value }));
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">💊</span>
-          <h1 className="text-xl font-bold text-gray-800">Gerenciar Produtos e Insumos</h1>
-        </div>
-        <button 
-          onClick={() => navigate('/dashboard-admin')}
-          className="text-sm font-medium text-blue-600 hover:underline cursor-pointer"
-        >
-          Voltar ao Painel
-        </button>
-      </header>
-
-      <main className="flex-1 p-8 max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* Coluna da Esquerda: Formulário de Cadastro */}
-        <div className="md:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Novo Insumo</h2>
-          
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-              <input
-                type="text"
-                required
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Ex: Vitamina C 500mg"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preço Base (R$)</label>
-              <input
-                type="text"
-                required
-                value={preco}
-                onChange={(e) => setPreco(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Ex: 15.50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descrição (Opcional)</label>
-              <textarea
-                rows={2}
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                placeholder="Ex: Frasco com 30 cápsulas"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2 mt-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? 'Salvando...' : 'Cadastrar'}
-            </button>
-          </form>
+    <div className="flex flex-col gap-6">
+      {/* Toolbar */}
+      <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Catálogo de Produtos</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {isCarregando ? '...' : `${produtos.length} produto(s) cadastrado(s)`}
+            </p>
+          </div>
+          <button
+            onClick={abrirModalNovo}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2"
+          >
+            <span>➕</span> Novo Produto
+          </button>
         </div>
 
-        {/* Coluna da Direita: Lista de Produtos */}
-        <div className="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Catálogo Registrado</h2>
-          
-          {produtos.length === 0 ? (
-            <div className="text-center py-10 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-              <p>Nenhum produto cadastrado ainda.</p>
+        {/* Tabela */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {isCarregando ? (
+            <div className="p-10 text-center text-gray-500">Carregando...</div>
+          ) : produtos.length === 0 ? (
+            <div className="p-10 text-center text-gray-500 border-2 border-dashed border-gray-200 m-6 rounded-xl">
+              <p className="text-lg">Nenhum produto cadastrado ainda.</p>
+              <button
+                onClick={abrirModalNovo}
+                className="mt-3 text-blue-600 font-semibold hover:underline text-sm"
+              >
+                Criar o primeiro produto
+              </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="py-3 px-4 font-semibold text-sm text-gray-600">Insumo / Produto</th>
-                    <th className="py-3 px-4 font-semibold text-sm text-gray-600">Descrição</th>
-                    <th className="py-3 px-4 font-semibold text-sm text-gray-600 text-right">Preço</th>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nome</th>
+                    <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Preço</th>
+                    <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Estoque</th>
+                    <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="py-3 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {produtos.map((produto) => (
-                    <tr key={produto.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-gray-800">{produto.nome}</td>
-                      <td className="py-3 px-4 text-sm text-gray-500">{produto.descricao || '-'}</td>
-                      <td className="py-3 px-4 font-medium text-green-600 text-right">
-                        R$ {Number(produto.preco).toFixed(2).replace('.', ',')}
+                  {produtos.map((p) => (
+                    <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-5">
+                        <p className="font-semibold text-gray-800">{p.nome}</p>
+                        {p.descricao && (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{p.descricao}</p>
+                        )}
+                      </td>
+                      <td className="py-4 px-5 font-medium text-green-700">
+                        R$ {Number(p.preco).toFixed(2).replace('.', ',')}
+                      </td>
+                      <td className="py-4 px-5 text-gray-700">{p.estoque}</td>
+                      <td className="py-4 px-5">
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                          p.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {p.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => abrirModalEditar(p)}
+                            className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 font-semibold rounded-lg transition-colors"
+                          >
+                            Editar
+                          </button>
+                          {p.ativo && (
+                            <button
+                              onClick={() => handleInativar(p)}
+                              disabled={isInativando === p.id}
+                              className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 font-semibold rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isInativando === p.id ? 'Processando...' : 'Inativar'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -166,9 +240,121 @@ export default function AdminProdutos() {
               </table>
             </div>
           )}
-        </div>
+      </div>
 
-      </main>
+      {/* Modal Criar / Editar */}
+      {modalAberto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-800">
+                {produtoEditando ? 'Editar Produto' : 'Novo Produto'}
+              </h3>
+            </div>
+
+            <form onSubmit={handleSalvar} className="p-6 flex flex-col gap-5">
+              {/* Nome */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  required
+                  value={form.nome}
+                  onChange={campo('nome')}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="Ex: Vitamina C 500mg"
+                />
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Descrição</label>
+                <textarea
+                  rows={2}
+                  value={form.descricao}
+                  onChange={campo('descricao')}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"
+                  placeholder="Ex: Frasco com 30 cápsulas"
+                />
+              </div>
+
+              {/* Preço + Estoque */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Preço (R$) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={form.preco}
+                    onChange={campo('preco')}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="w-32">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estoque</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.estoque}
+                    onChange={campo('estoque')}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* URL da imagem */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">URL da Imagem</label>
+                <input
+                  type="url"
+                  value={form.imagemUrl}
+                  onChange={campo('imagemUrl')}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="https://..."
+                />
+              </div>
+
+              {/* Ativo */}
+              {produtoEditando && (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="ativo"
+                    checked={form.ativo}
+                    onChange={(e) => setForm((f) => ({ ...f, ativo: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="ativo" className="text-sm font-semibold text-gray-700">
+                    Produto ativo (visível no catálogo)
+                  </label>
+                </div>
+              )}
+
+              {/* Botões */}
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  disabled={isSalvando}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSalvando}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isSalvando ? 'Processando...' : produtoEditando ? 'Salvar Alterações' : 'Criar Produto'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

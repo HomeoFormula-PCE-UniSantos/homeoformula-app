@@ -5,5 +5,6 @@ export class Orcamento {
     public readonly arquivoReceitaUrl: string,
     public readonly status: 'PENDENTE' | 'RESPONDIDO',
     public readonly observacoes?: string,
+    public readonly familiarId?: string,
   ) {}
 }

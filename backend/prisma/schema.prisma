@@ -6,10 +6,16 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  ADMIN
+  CLIENTE
+}
+
 model Usuario {
   id           String      @id @default(uuid())
   email        String      @unique
   senha        String
+  role         Role        @default(CLIENTE)
   criadoEm    DateTime    @default(now())
   atualizadoEm DateTime    @updatedAt
   familiares   Familiar[]
@@ -17,38 +23,61 @@ model Usuario {
 }
 
 model Familiar {
-  id             String    @id @default(uuid())
+  id             String      @id @default(uuid())
   usuarioId      String
   nome           String
   parentesco     String
   dataNascimento DateTime?
 
-  usuario        Usuario   @relation(fields: [usuarioId], references: [id])
+  usuario        Usuario     @relation(fields: [usuarioId], references: [id])
+  orcamentos     Orcamento[]
 
   @@map("familiares")
 }
 
 model Orcamento {
-  id                String   @id @default(uuid())
+  id                String           @id @default(uuid())
   clienteId         String
+  familiarId        String?
   arquivoReceitaUrl String
-  status            String   @default("PENDENTE")
+  status            String           @default("PENDENTE")
   observacoes       String?
-  criadoEm         DateTime @default(now())
+  respostaAdmin     String?
+  preco             Decimal?         @db.Decimal(10, 2)
+  criadoEm         DateTime         @default(now())
 
-  usuario           Usuario  @relation(fields: [clienteId], references: [id])
+  usuario           Usuario          @relation(fields: [clienteId], references: [id])
+  familiar          Familiar?        @relation(fields: [familiarId], references: [id])
+  itens             OrcamentoItem[]
 
   @@map("orcamentos")
 }
 
 model Produto {
-  id           String   @id @default(uuid())
+  id           String          @id @default(uuid())
   nome         String
   descricao    String?
-  preco        Decimal  @db.Decimal(10, 2)
-  ativo        Boolean  @default(true)
-  criadoEm    DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  preco        Decimal         @db.Decimal(10, 2)
+  estoque      Int             @default(0)
+  imagemUrl    String?
+  ativo        Boolean         @default(true)
+  criadoEm    DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  itens        OrcamentoItem[]
 
   @@map("produtos")
+}
+
+model OrcamentoItem {
+  id            String    @id @default(uuid())
+  orcamentoId   String
+  produtoId     String
+  quantidade    Int
+  precoUnitario Decimal   @db.Decimal(10, 2)
+
+  orcamento     Orcamento @relation(fields: [orcamentoId], references: [id])
+  produto       Produto   @relation(fields: [produtoId], references: [id])
+
+  @@map("orcamento_itens")
 }

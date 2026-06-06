@@ -11,7 +11,6 @@ export class MinioStorageAdapter implements StoragePort {
 
   constructor() {
     this.minioClient = new Client({
-      // Lê o nome do serviço do docker-compose ("minio") em vez de localhost
       endPoint: process.env.MINIO_ENDPOINT || 'localhost',
       port: parseInt(process.env.MINIO_PORT || '9000', 10),
       useSSL: false,
@@ -34,28 +33,43 @@ export class MinioStorageAdapter implements StoragePort {
     }
   }
 
+  // Registros antigos têm a URL completa; novos terão apenas a chave.
+  private extrairObjectKey(valor: string): string {
+    if (valor.startsWith('http')) {
+      return valor.split('/').pop() ?? valor;
+    }
+    return valor;
+  }
+
   async uploadArquivo(nomeArquivo: string, buffer: Buffer, mimetype: string): Promise<string> {
-    // Adiciona um hash no nome do arquivo para evitar substituir arquivos com o mesmo nome
     const hash = crypto.randomBytes(8).toString('hex');
     const nomeUnico = `${hash}-${nomeArquivo.replace(/\s+/g, '_')}`;
 
     try {
-      // Faz o upload real do buffer para o MinIO
       await this.minioClient.putObject(
         this.bucketName,
         nomeUnico,
         buffer,
         buffer.length,
-        { 'Content-Type': mimetype }
+        { 'Content-Type': mimetype },
       );
-
       this.logger.log(`Upload concluído: ${nomeUnico}`);
-
-      // Retorna a URL de acesso público (ajustada para o ambiente local)
-      return `http://localhost:9000/${this.bucketName}/${nomeUnico}`;
+      // Salva apenas a chave — a URL pré-assinada é gerada em tempo de leitura
+      return nomeUnico;
     } catch (error) {
       this.logger.error(`Erro ao fazer upload do arquivo ${nomeUnico}`, error);
       throw new Error('Falha na comunicação com o servidor de armazenamento.');
+    }
+  }
+
+  async gerarUrlAssinada(objectKey: string): Promise<string> {
+    const chave = this.extrairObjectKey(objectKey);
+    try {
+      // expiry = 3600 segundos (1 hora)
+      return await this.minioClient.presignedGetObject(this.bucketName, chave, 3600);
+    } catch (error) {
+      this.logger.error(`Erro ao gerar URL pré-assinada para ${chave}`, error);
+      throw new Error('Não foi possível gerar o link de acesso ao arquivo.');
     }
   }
 }
