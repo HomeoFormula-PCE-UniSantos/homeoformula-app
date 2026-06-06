@@ -1,4 +1,4 @@
-# Plataforma HomeoFormula 🧪
+# Plataforma HomeoFormula 
 Projeto de Extensão Curricular (PCE) do curso de Ciência da Computação da Universidade Católica de Santos (UniSantos).
 
 # Sobre o Projeto
