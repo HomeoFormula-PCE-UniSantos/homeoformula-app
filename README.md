@@ -38,7 +38,7 @@ Controle de Versão e Repositório: GitHub
 
 Gestão e Documentação do Projeto: Google Workspace
 
-### 📄 Documentação Oficial
+# Documentação Oficial
 Para acessar os diagramas, artefatos de planejamento, atas de reunião e ADRs, visite o nosso repositório de documentação: [HomeoFormula-Docs](https://github.com/HomeoFormula-PCE-UniSantos/homeoformula-docs)
 
 # Equipe de Desenvolvimento
